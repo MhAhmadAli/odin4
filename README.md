@@ -9,6 +9,7 @@ A reconstructed version of Samsung's Odin4 firmware flashing tool, based on:
 
 > [!WARNING]
 > **UNDER DEVELOPMENT - EDUCATIONAL PURPOSE ONLY**
+>
 > This tool is a reconstruction intended for **EDUCATIONAL PURPOSES ONLY**.
 > It is **NOT FULLY TESTED** and is not intended for production using.
 > Use at your own risk. Incorrect usage or bugs could potentially **BRICK** your device.
