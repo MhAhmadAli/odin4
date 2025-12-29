@@ -10,16 +10,15 @@
 
 namespace Odin {
 
-// PIT file structure
+// PIT file structure - must be packed to match binary format
+#pragma pack(push, 1)
 struct PITHeader {
     uint32_t magic;           // 0x12349876
     uint32_t entryCount;
     char gangName[8];         // "COM_TAR2" usually
     char projectName[8];
-    uint32_t reserved[2];     // Usually 0
+    // Total: 4 + 4 + 8 + 8 = 24 bytes
 };
-
-static_assert(sizeof(PITHeader) == 28, "PITHeader size mismatch");
 
 struct PITRawEntry {
     uint32_t binaryType;
@@ -34,8 +33,11 @@ struct PITRawEntry {
     char partitionName[32];
     char flashFilename[32];
     char fotaFilename[32];
+    // Total: 9*4 + 32*3 = 36 + 96 = 132 bytes
 };
+#pragma pack(pop)
 
+static_assert(sizeof(PITHeader) == 24, "PITHeader size mismatch");
 static_assert(sizeof(PITRawEntry) == 132, "PITRawEntry size mismatch");
 
 PIT::PIT()

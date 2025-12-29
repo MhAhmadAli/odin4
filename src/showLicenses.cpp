@@ -5,8 +5,7 @@
 
 #include <iostream>
 
-namespace Odin {
-
+// Not in namespace so it can be called from main
 void showLicenses() {
     std::cout << R"(
 Odin4 - Samsung Firmware Flashing Tool for Linux
@@ -72,5 +71,3 @@ using this software. Always backup your data before flashing firmware.
 Samsung and Odin are trademarks of Samsung Electronics Co., Ltd.
 )" << std::endl;
 }
-
-} // namespace Odin
