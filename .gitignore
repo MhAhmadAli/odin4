@@ -1,0 +1,33 @@
+# Build directory
+build/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Compiled objects
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+
+# Executables
+odin4
+*.exe
+
+# Decompiled files (keep in separate directory)
+decompiled/
+
+# OS files
+.DS_Store
+Thumbs.db
