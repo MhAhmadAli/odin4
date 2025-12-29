@@ -43,18 +43,20 @@ sudo dnf install libusb1-devel lz4-devel zlib-devel cryptopp-devel
 
 ## Building
 
-### With CMake (recommended)
+### Prerequisites
+
+Ensure you have the required dependencies installed (see Requirements above).
+
+### Compile
 
 ```bash
-mkdir build && cd build
-cmake ..
 make
 ```
 
-### With Make (fallback)
+### Clean
 
 ```bash
-make
+make clean
 ```
 
 ## Installation
@@ -159,8 +161,7 @@ Samsung and Odin are trademarks of Samsung Electronics Co., Ltd.
 
 ```
 odin4/
-├── CMakeLists.txt          # CMake build configuration
-├── Makefile                # Fallback Makefile
+├── Makefile                # Build system
 ├── README.md               # This file
 ├── include/
 │   ├── DownloadEngine.h    # Core protocol class
