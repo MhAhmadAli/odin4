@@ -11,6 +11,9 @@ void showLicenses() {
 Odin4 - Samsung Firmware Flashing Tool for Linux
 =================================================
 
+Reconstructed by MhAhmadAli
+https://github.com/MhAhmadAli
+
 This software is a reconstruction based on:
 - Heimdall by Benjamin Dobell (MIT License)
 - Original Samsung Odin4 tool

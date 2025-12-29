@@ -136,10 +136,9 @@ sudo udevadm trigger
 
 ### Device not detected
 
-1. Ensure device is in Download Mode (hold Volume Down + Home + Power, then Volume Up)
+1. Ensure device is in Download Mode
 2. Check USB connection
-3. Try `sudo rmmod cdc_acm` if using older kernel
-4. Verify udev rules are installed
+3. Verify udev rules are installed
 
 ### Permission denied
 
@@ -190,6 +189,12 @@ odin4/
     ├── Tar.cpp             # TAR handling
     └── UsbDeviceImpl.cpp   # USB implementation
 ```
+
+## Developer
+
+Reconstructed by **MhAhmadAli**
+
+- GitHub: [https://github.com/MhAhmadAli](https://github.com/MhAhmadAli)
 
 ## Acknowledgements
 

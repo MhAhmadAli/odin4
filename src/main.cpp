@@ -25,6 +25,7 @@ using namespace Odin;
 
 // Version info
 constexpr const char* VERSION = "1.2.1-dc05e3ea";
+constexpr const char* DEVELOPER = "MhAhmadAli";
 
 // Forward declarations
 void showLicenses();
@@ -33,6 +34,7 @@ void printUsage() {
     std::cout << "\n"
               << "Odin4 - Samsung Firmware Flashing Tool\n"
               << "Version: " << VERSION << "\n"
+              << "Developer: " << DEVELOPER << "\n"
               << "========================================\n"
               << "\n"
               << "Usage: odin4 [options] ...\n"
