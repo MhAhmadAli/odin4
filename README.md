@@ -1,6 +1,6 @@
-# Odin4 - Samsung Firmware Flashing Tool for Linux
+# Odin4 - Samsung Firmware Flashing Tool
 
-A reconstructed version of Samsung's Odin4 firmware flashing tool for Linux, based on:
+A reconstructed version of Samsung's Odin4 firmware flashing tool, based on:
 - Decompiled binary analysis (Ghidra)
 - Heimdall open-source reference (MIT License)
 
