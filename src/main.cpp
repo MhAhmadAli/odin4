@@ -110,6 +110,11 @@ int main(int argc, char** argv) {
         std::cout << "Usage: odin4 -h" << std::endl;
         return 1;
     }
+
+    // Development Warning
+    std::cerr << "WARNING: This tool is under development and NOT FULLY TESTED.\n"
+              << "Use at your own risk. Incorrect usage may BRICK your device.\n"
+              << std::endl;
     
     // Initialize
     std::vector<std::string> devicePaths;

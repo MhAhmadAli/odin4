@@ -7,6 +7,12 @@ A reconstructed version of Samsung's Odin4 firmware flashing tool, based on:
 ## Version
 1.2.1-dc05e3ea
 
+> [!WARNING]
+> **UNDER DEVELOPMENT**
+> This tool is a reconstruction and is **NOT FULLY TESTED**. 
+> Use at your own risk. Incorrect usage or bugs could potentially **BRICK** your device.
+> Always verify partition tables and firmware files before flashing.
+
 ## Features
 
 - Flash firmware to Samsung devices in Download Mode
