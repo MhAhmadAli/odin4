@@ -67,7 +67,7 @@ https://github.com/lz4/lz4
 DISCLAIMER
 ----------
 
-This tool is provided for educational and legitimate device maintenance purposes.
+This tool is provided for EDUCATIONAL PURPOSES ONLY.
 Use at your own risk. The authors are not responsible for any damage caused by
 using this software. Always backup your data before flashing firmware.
 

@@ -8,8 +8,9 @@ A reconstructed version of Samsung's Odin4 firmware flashing tool, based on:
 1.2.1-dc05e3ea
 
 > [!WARNING]
-> **UNDER DEVELOPMENT**
-> This tool is a reconstruction and is **NOT FULLY TESTED**. 
+> **UNDER DEVELOPMENT - EDUCATIONAL PURPOSE ONLY**
+> This tool is a reconstruction intended for **EDUCATIONAL PURPOSES ONLY**.
+> It is **NOT FULLY TESTED** and is not intended for production using.
 > Use at your own risk. Incorrect usage or bugs could potentially **BRICK** your device.
 > Always verify partition tables and firmware files before flashing.
 
@@ -156,7 +157,9 @@ See [showLicenses.cpp](src/showLicenses.cpp) for full license information includ
 
 ## Disclaimer
 
-This tool is provided for educational and legitimate device maintenance purposes.
+This tool is provided for **EDUCATIONAL PURPOSES ONLY**. It is a reconstruction enabling
+study of the Samsung Odin protocol. It is not affiliated with or endorsed by Samsung.
+
 Use at your own risk. The authors are not responsible for any damage caused by
 using this software. Always backup your data before flashing firmware.
 
