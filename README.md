@@ -173,9 +173,13 @@ Ensure all dependencies are installed. Run `make deps` to check.
 
 ## License
 
-This software is provided under the MIT License.
+Odin4's own source code is released under the MIT License — see [LICENSE](LICENSE).
 
-See [showLicenses.cpp](src/showLicenses.cpp) for full license information including third-party libraries.
+It links against third-party libraries under their own terms, including
+libusb (LGPL-2.1-or-later) and, depending on build configuration, OpenSSL
+(Apache-2.0) or Crypto++ (BSL-1.0). The required notices and full license
+texts are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md); `odin4 -w`
+prints a condensed version at runtime.
 
 ## Disclaimer
 
@@ -185,6 +189,11 @@ study of the Samsung Odin protocol. It is not affiliated with or endorsed by Sam
 Use at your own risk. The authors are not responsible for any damage caused by
 using this software. Always backup your data before flashing firmware.
 
+The MIT License covers this project's own code only. It grants no rights in
+Samsung's original software, and reverse engineering or redistributing work
+derived from a proprietary binary may be restricted in your jurisdiction
+independently of that license.
+
 Samsung and Odin are trademarks of Samsung Electronics Co., Ltd.
 
 ## Project Structure
@@ -193,6 +202,8 @@ Samsung and Odin are trademarks of Samsung Electronics Co., Ltd.
 odin4/
 ├── Makefile                # Build system
 ├── README.md               # This file
+├── LICENSE                 # MIT License for this project
+├── THIRD-PARTY-NOTICES.md  # Notices for bundled/linked components
 ├── include/
 │   ├── DownloadEngine.h    # Core protocol class
 │   ├── FirmwareData.h      # Firmware parsing

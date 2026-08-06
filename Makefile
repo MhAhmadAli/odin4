@@ -82,12 +82,20 @@ clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.d
 
+DOCDIR = $(PREFIX)/share/doc/$(TARGET)
+
 install: $(TARGET)
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(TARGET) $(DESTDIR)$(PREFIX)/bin/
+	# The MIT/BSD/Apache components require their notices to travel with any
+	# distribution, so install them next to the binary.
+	install -d $(DESTDIR)$(DOCDIR)
+	install -m 644 LICENSE THIRD-PARTY-NOTICES.md $(DESTDIR)$(DOCDIR)/
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(TARGET)
+	rm -f $(DESTDIR)$(DOCDIR)/LICENSE $(DESTDIR)$(DOCDIR)/THIRD-PARTY-NOTICES.md
+	-rmdir $(DESTDIR)$(DOCDIR) 2>/dev/null || true
 
 # Dependencies check
 deps:
