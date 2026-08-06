@@ -117,8 +117,11 @@ UsbDeviceImpl::UsbDeviceImpl(const std::string& devicePath)
     , valid_(false)
     , systemLSI_(false)
     , supportedZLP_(false)
+    , zlpOutEnabled_(true)
     , interfaceClaimed_(false)
+#ifdef __linux__
     , detachedDriver_(false)
+#endif
 {
     valid_ = initialize(devicePath);
 }
@@ -351,6 +354,26 @@ int UsbDeviceImpl::write(const char* data, size_t size, unsigned int timeout) {
     if (result == LIBUSB_ERROR_TIMEOUT) {
         Log::error(TAG, "Write timed out after " + std::to_string(transferred) +
                    "/" + std::to_string(size) + " bytes");
+    }
+
+    // Terminate the transfer with a zero-length packet. The Odin protocol
+    // expects one after every packet the host sends; without it, a bootloader
+    // in large-packet mode does not consider a 1024-byte command (an exact
+    // multiple of the 512-byte USB packet size) complete until the *next*
+    // transfer arrives, which delays every reply by one command. Thor does the
+    // same after every bulk write, and like Thor we stop after the first
+    // rejection for bootloaders that do not want them.
+    if (zlpOutEnabled_ && result == LIBUSB_SUCCESS) {
+        unsigned char dummy = 0;
+        int zlpTransferred = 0;
+        int zlpResult = libusb_bulk_transfer(handle_,
+                                             static_cast<unsigned char>(outEndpoint_),
+                                             &dummy, 0, &zlpTransferred, ZLP_TIMEOUT);
+        if (zlpResult != LIBUSB_SUCCESS) {
+            Log::info(TAG, "Device rejected a zero-length packet (" +
+                      std::to_string(zlpResult) + "); disabling them");
+            zlpOutEnabled_ = false;
+        }
     }
 
     return transferred;

@@ -11,12 +11,19 @@ DESTDIR ?=
 
 PKG_CONFIG ?= pkg-config
 
+# Third-party headers come in through -isystem so that -Wall -Wextra -Wpedantic
+# only ever complains about our own code. libusb.h in particular uses zero-length
+# and flexible array members that -Wpedantic flags on every translation unit.
+sysinc = $(patsubst -I%,-isystem %,$(1))
+
 # Check for macOS
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
-    # macOS specific settings
-    CXXFLAGS += -I/opt/homebrew/include -I/usr/local/include
-    LDFLAGS = -L/opt/homebrew/lib -L/usr/local/lib
+    # macOS specific settings. Homebrew lives in /opt/homebrew on Apple Silicon
+    # and /usr/local on Intel; only pass the prefixes that actually exist,
+    # otherwise the linker warns about a missing search path.
+    CXXFLAGS += $(call sysinc,$(patsubst %,-I%,$(wildcard /opt/homebrew/include /usr/local/include)))
+    LDFLAGS = $(patsubst %,-L%,$(wildcard /opt/homebrew/lib /usr/local/lib))
 else
     LDFLAGS =
 endif
@@ -28,14 +35,14 @@ ifeq ($(strip $(LIBUSB_LIBS)),)
     # let the linker report the problem if it really is missing.
     LIBUSB_LIBS := -lusb-1.0
 endif
-CXXFLAGS += $(shell $(PKG_CONFIG) --cflags libusb-1.0 2>/dev/null)
+CXXFLAGS += $(call sysinc,$(shell $(PKG_CONFIG) --cflags libusb-1.0 2>/dev/null))
 LDFLAGS += $(LIBUSB_LIBS)
 
 # Optional lz4. Only advertise HAVE_LZ4 when the headers are really there;
 # linking -llz4 unconditionally broke the build on machines without it.
 LZ4_LIBS := $(shell $(PKG_CONFIG) --libs liblz4 2>/dev/null)
 ifneq ($(strip $(LZ4_LIBS)),)
-    CXXFLAGS += $(shell $(PKG_CONFIG) --cflags liblz4 2>/dev/null) -DHAVE_LZ4
+    CXXFLAGS += $(call sysinc,$(shell $(PKG_CONFIG) --cflags liblz4 2>/dev/null)) -DHAVE_LZ4
     LDFLAGS += $(LZ4_LIBS)
 endif
 
@@ -43,7 +50,7 @@ endif
 CRYPTOPP := $(shell $(PKG_CONFIG) --exists cryptopp 2>/dev/null && echo "yes")
 ifeq ($(CRYPTOPP),yes)
     LDFLAGS += $(shell $(PKG_CONFIG) --libs cryptopp)
-    CXXFLAGS += $(shell $(PKG_CONFIG) --cflags cryptopp) -DHAVE_CRYPTOPP
+    CXXFLAGS += $(call sysinc,$(shell $(PKG_CONFIG) --cflags cryptopp)) -DHAVE_CRYPTOPP
 else
     # Try OpenSSL as fallback
     LDFLAGS += -lcrypto

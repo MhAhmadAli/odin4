@@ -29,6 +29,7 @@ constexpr int MAX_PACKET_SIZE = 0x100000;        // 1MB
 constexpr int DEFAULT_TIMEOUT = 30000;           // 30 seconds
 constexpr int HANDSHAKE_TIMEOUT = 1000;          // 1 second
 constexpr int TRANSFER_TIMEOUT = 60000;          // 60 seconds
+constexpr int ZLP_TIMEOUT = 100;                 // zero-length packet terminator
 
 struct DeviceInfo {
     std::string path;
@@ -105,8 +106,16 @@ private:
     bool valid_;
     bool systemLSI_;
     bool supportedZLP_;
+    // Whether write() terminates each bulk-out transfer with a zero-length
+    // packet. S-Boot expects one after every packet; disabled on the first
+    // device that rejects it.
+    bool zlpOutEnabled_;
     bool interfaceClaimed_;
+#ifdef __linux__
+    // Only Linux detaches/re-attaches the kernel driver, so the flag exists
+    // there only; declaring it everywhere just draws -Wunused-private-field.
     bool detachedDriver_;
+#endif
 };
 
 } // namespace Odin

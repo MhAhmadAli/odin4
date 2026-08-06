@@ -57,6 +57,8 @@ void printUsage() {
               << "  -d <path>           Specify device path (auto-detects if omitted)\n"
               << "  -e                  Erase NAND before flashing\n"
               << "  --reboot            Reboot to normal mode after flashing\n"
+              << "  --power-off         Power off after flashing, to boot a freshly\n"
+              << "                      flashed recovery with the key combo\n"
               << "  --redownload        Reboot to download mode (if supported)\n"
               << "\n"
               << "----------------------------------------\n"
@@ -73,6 +75,10 @@ void printUsage() {
               << "  # List and select specific device:\n"
               << "  odin4 -l\n"
               << "  odin4 -b BL.tar -a AP.tar -d /dev/bus/usb/001/004\n"
+              << "\n"
+              << "  # Flash a custom recovery and power off, so the system does not\n"
+              << "  # boot first and restore the stock one:\n"
+              << "  odin4 -a twrp.tar --power-off\n"
               << "\n";
 }
 
@@ -92,11 +98,13 @@ void downloadThread(const std::string& devicePath,
                     FirmwareData firmware,
                     bool redownload,
                     bool reboot,
+                    bool powerOff,
                     std::atomic<int>& successCount) {
     Log::setDevicePrefix(devicePath);
 
     DownloadEngine engine(devicePath, &firmware);
     engine.setRebootAfterDownload(reboot);
+    engine.setPowerOffAfterDownload(powerOff);
 
     bool result;
     if (redownload) {
@@ -126,6 +134,7 @@ int main(int argc, char** argv) {
     FirmwareData firmware;
     bool redownload = false;
     bool reboot = false;
+    bool powerOff = false;
     bool haveFirmware = false;
 
     // Check if stdin is a terminal
@@ -213,6 +222,12 @@ int main(int argc, char** argv) {
             continue;
         }
 
+        if (arg == "--power-off") {
+            std::cout << "Power off after flashing" << std::endl;
+            powerOff = true;
+            continue;
+        }
+
         if (arg == "--redownload") {
             std::cout << "Reboot into download mode if it possible (not working in normal case)"
                       << std::endl;
@@ -225,10 +240,16 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // The device can do one thing when the session ends, not two.
+    if (reboot && powerOff) {
+        std::cerr << "odin4: --reboot and --power-off are mutually exclusive" << std::endl;
+        return 1;
+    }
+
     // Refuse to talk to a device with nothing to do. Previously "odin4 -e"
     // opened a session, erased nothing and reported success.
-    // --reboot and --redownload are jobs in their own right.
-    if (!haveFirmware && !redownload && !reboot) {
+    // --reboot, --power-off and --redownload are jobs in their own right.
+    if (!haveFirmware && !redownload && !reboot && !powerOff) {
         std::cerr << "odin4: nothing to do (see odin4 -h)" << std::endl;
         return 1;
     }
@@ -252,6 +273,7 @@ int main(int argc, char** argv) {
 
         DownloadEngine engine(devicePaths[0], &firmware);
         engine.setRebootAfterDownload(reboot);
+        engine.setPowerOffAfterDownload(powerOff);
 
         bool result;
         if (redownload) {
@@ -259,7 +281,15 @@ int main(int argc, char** argv) {
         } else {
             result = engine.download();
         }
-        
+
+        if (result && powerOff && engine.poweredOff()) {
+            std::cout << "\nDevice powered off. To boot a recovery you just flashed,\n"
+                      << "hold the recovery key combo from cold rather than letting the\n"
+                      << "system start: on most models Volume Up + Power (add Bixby on\n"
+                      << "older ones), releasing Power when the logo appears.\n"
+                      << std::endl;
+        }
+
         return result ? 0 : 1;
     }
     
@@ -272,7 +302,7 @@ int main(int argc, char** argv) {
 
     for (const auto& path : devicePaths) {
         threads.emplace_back(downloadThread, path, firmware, redownload, reboot,
-                            std::ref(successCount));
+                            powerOff, std::ref(successCount));
     }
 
     // Wait for all threads
