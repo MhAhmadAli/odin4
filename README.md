@@ -27,6 +27,9 @@ A reconstructed version of Samsung's Odin4 firmware flashing tool, based on:
 - PIT (Partition Information Table) handling
 - MD5/SHA256 verification
 
+For `.tar.md5` files the checksum appended by Samsung is checked against the
+archive contents, and a mismatch aborts the flash.
+
 ## Requirements
 
 ### macOS
@@ -61,6 +64,10 @@ Ensure you have the required dependencies installed (see Requirements above).
 make
 ```
 
+Object files land in `build/`. `liblz4` and `crypto++` are optional: the build
+detects them with `pkg-config` and falls back to OpenSSL for hashing when
+crypto++ is absent.
+
 ### Clean
 
 ```bash
@@ -71,6 +78,12 @@ make clean
 
 ```bash
 sudo make install
+```
+
+`PREFIX` (default `/usr/local`) and `DESTDIR` are both honoured:
+
+```bash
+make install PREFIX=/usr DESTDIR=/tmp/staging
 ```
 
 Or manually copy the `odin4` binary to your PATH.
@@ -113,11 +126,19 @@ odin4 -V partition.pit -b BL.tar.md5 -a AP.tar.md5
 | `-c FILE` | Add CP (Modem) image file |
 | `-s FILE` | Add CSC file |
 | `-u FILE` | Add UMS file |
-| `-V FILE` | Validate with PIT file |
+| `-V FILE` | Write the given PIT (partition table) to the device |
 | `-e` | Enable NAND erase |
-| `-d PATH` | Specify device path |
+| `-d PATH` | Specify device path (repeat for multi-device flashing) |
 | `--reboot` | Reboot to normal mode after flash |
 | `--redownload` | Reboot to download mode |
+
+> [!CAUTION]
+> `-V` repartitions the device. Only pass a PIT that matches the exact model
+> you are flashing.
+
+At least one of `-b`, `-a`, `-c`, `-s`, `-u`, `-V`, `--reboot` or
+`--redownload` must be given; the tool will not open a session with nothing
+to do.
 
 ## udev Rules (Linux)
 
@@ -152,9 +173,13 @@ Ensure all dependencies are installed. Run `make deps` to check.
 
 ## License
 
-This software is provided under the MIT License.
+Odin4's own source code is released under the MIT License — see [LICENSE](LICENSE).
 
-See [showLicenses.cpp](src/showLicenses.cpp) for full license information including third-party libraries.
+It links against third-party libraries under their own terms, including
+libusb (LGPL-2.1-or-later) and, depending on build configuration, OpenSSL
+(Apache-2.0) or Crypto++ (BSL-1.0). The required notices and full license
+texts are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md); `odin4 -w`
+prints a condensed version at runtime.
 
 ## Disclaimer
 
@@ -164,6 +189,11 @@ study of the Samsung Odin protocol. It is not affiliated with or endorsed by Sam
 Use at your own risk. The authors are not responsible for any damage caused by
 using this software. Always backup your data before flashing firmware.
 
+The MIT License covers this project's own code only. It grants no rights in
+Samsung's original software, and reverse engineering or redistributing work
+derived from a proprietary binary may be restricted in your jurisdiction
+independently of that license.
+
 Samsung and Odin are trademarks of Samsung Electronics Co., Ltd.
 
 ## Project Structure
@@ -172,6 +202,8 @@ Samsung and Odin are trademarks of Samsung Electronics Co., Ltd.
 odin4/
 ├── Makefile                # Build system
 ├── README.md               # This file
+├── LICENSE                 # MIT License for this project
+├── THIRD-PARTY-NOTICES.md  # Notices for bundled/linked components
 ├── include/
 │   ├── DownloadEngine.h    # Core protocol class
 │   ├── FirmwareData.h      # Firmware parsing

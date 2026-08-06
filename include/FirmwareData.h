@@ -55,14 +55,21 @@ public:
     
 private:
     bool parseBinaryInternal(const std::string& path);
+    bool parseBinaryInternal(const std::string& path, int gzipDepth);
     bool parseTAR(const std::string& path, FirmwareType type);
     bool parseBIN(const std::string& path, FirmwareType type);
-    
+
     bool verifyMD5(const std::string& path);
     bool verifySHA256(const std::string& path);
-    void extractGzipFile(const std::string& src, const std::string& dst);
-    bool parseLZ4FrameHeader(const char* data, FirmwareInfo& info);
-    
+
+    // Decompresses src into a freshly created temporary file whose path is
+    // returned in dst. The caller owns that file and must unlink it.
+    bool extractGzipFile(const std::string& src, std::string& dst);
+    bool parseLZ4FrameHeader(const char* data, size_t size, FirmwareInfo& info);
+
+    static std::string baseName(const std::string& path);
+    static std::string extractTrailingMD5(const std::string& trailer);
+
     // File paths
     std::string blPath_;
     std::string apPath_;

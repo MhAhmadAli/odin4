@@ -97,8 +97,6 @@ public:
 private:
     std::vector<PITEntry> entries_;
     uint32_t headerCount_;
-    std::string gangName_;
-    std::string projectName_;
 };
 
 } // namespace Odin

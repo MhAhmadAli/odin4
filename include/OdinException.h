@@ -1,11 +1,12 @@
 /*
  * Odin4 - Samsung Firmware Flashing Tool for Linux
- * Copyright (c) 2024
+ * Copyright (c) MhAhmadAli
  *
  * Reconstructed from decompiled binary with reference to:
  * - Heimdall (MIT License) by Benjamin Dobell
  *
- * This is free software under the MIT License.
+ * Released under the MIT License. See LICENSE at the root of this
+ * repository, and THIRD-PARTY-NOTICES.md for third-party components.
  */
 
 #ifndef ODIN_EXCEPTION_H
