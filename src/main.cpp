@@ -6,11 +6,11 @@
  * Version: 1.2.1-dc05e3ea
  */
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <thread>
-#include <mutex>
 #include <atomic>
 #include <cstring>
 #include <unistd.h>
@@ -88,29 +88,24 @@ std::vector<std::string> listDevices() {
     return paths;
 }
 
-struct ThreadResult {
-    bool success;
-    std::string devicePath;
-};
-
-void downloadThread(const std::string& devicePath, 
+void downloadThread(const std::string& devicePath,
                     FirmwareData firmware,
                     bool redownload,
-                    std::atomic<int>& successCount,
-                    std::mutex& mutex) {
+                    bool reboot,
+                    std::atomic<int>& successCount) {
     Log::setDevicePrefix(devicePath);
-    
+
     DownloadEngine engine(devicePath, &firmware);
-    
+    engine.setRebootAfterDownload(reboot);
+
     bool result;
     if (redownload) {
         result = engine.redownload();
     } else {
         result = engine.download();
     }
-    
+
     if (result) {
-        std::lock_guard<std::mutex> lock(mutex);
         successCount++;
     }
 }
@@ -130,7 +125,9 @@ int main(int argc, char** argv) {
     std::vector<std::string> devicePaths;
     FirmwareData firmware;
     bool redownload = false;
-    
+    bool reboot = false;
+    bool haveFirmware = false;
+
     // Check if stdin is a terminal
     bool isInteractive = isatty(fileno(stdin)) != 0;
     Log::setInteractiveMode(isInteractive);
@@ -159,75 +156,83 @@ int main(int argc, char** argv) {
             return 0;
         }
         
-        if (arg == "-b" && i + 1 < argc) {
-            if (!firmware.setBootloader(argv[++i])) {
+        // Options that take a file or path argument. Reporting a missing
+        // argument as an "illegal option" was actively misleading.
+        if (arg == "-b" || arg == "-a" || arg == "-c" || arg == "-s" ||
+            arg == "-u" || arg == "-V" || arg == "-d") {
+            if (i + 1 >= argc) {
+                std::cerr << "odin4: option " << arg << " requires an argument" << std::endl;
                 return 1;
+            }
+
+            std::string value = argv[++i];
+            bool ok = true;
+
+            if (arg == "-b") {
+                ok = firmware.setBootloader(value);
+            } else if (arg == "-a") {
+                ok = firmware.setAP(value);
+            } else if (arg == "-c") {
+                ok = firmware.setCP(value);
+            } else if (arg == "-s") {
+                ok = firmware.setCSC(value);
+            } else if (arg == "-u") {
+                ok = firmware.setUMS(value);
+            } else if (arg == "-V") {
+                ok = firmware.setPIT(value);
+            } else {
+                // -d may be repeated for multi-device flashing, but the same
+                // device must not be opened twice.
+                if (std::find(devicePaths.begin(), devicePaths.end(), value) ==
+                    devicePaths.end()) {
+                    devicePaths.push_back(value);
+                } else {
+                    std::cerr << "odin4: duplicate device " << value << ", ignoring"
+                              << std::endl;
+                }
+            }
+
+            if (!ok) {
+                return 1;
+            }
+
+            if (arg != "-d") {
+                haveFirmware = true;
             }
             continue;
         }
-        
-        if (arg == "-a" && i + 1 < argc) {
-            if (!firmware.setAP(argv[++i])) {
-                return 1;
-            }
-            continue;
-        }
-        
-        if (arg == "-c" && i + 1 < argc) {
-            if (!firmware.setCP(argv[++i])) {
-                return 1;
-            }
-            continue;
-        }
-        
-        if (arg == "-s" && i + 1 < argc) {
-            if (!firmware.setCSC(argv[++i])) {
-                return 1;
-            }
-            continue;
-        }
-        
-        if (arg == "-u" && i + 1 < argc) {
-            if (!firmware.setUMS(argv[++i])) {
-                return 1;
-            }
-            continue;
-        }
-        
-        if (arg == "-V" && i + 1 < argc) {
-            if (!firmware.setPIT(argv[++i])) {
-                return 1;
-            }
-            continue;
-        }
-        
+
         if (arg == "-e") {
             firmware.setErase(true);
             continue;
         }
-        
-        if (arg == "-d" && i + 1 < argc) {
-            devicePaths.push_back(argv[++i]);
-            continue;
-        }
-        
+
         if (arg == "--reboot") {
             std::cout << "Reboot into normal mode" << std::endl;
+            reboot = true;
             continue;
         }
-        
+
         if (arg == "--redownload") {
-            std::cout << "Reboot into download mode if it possible (not working in normal case)" 
+            std::cout << "Reboot into download mode if it possible (not working in normal case)"
                       << std::endl;
             redownload = true;
             continue;
         }
-        
+
         // Unknown option
-        std::cout << "odin4: illegal option " << arg << std::endl;
+        std::cerr << "odin4: illegal option " << arg << std::endl;
         return 1;
     }
-    
+
+    // Refuse to talk to a device with nothing to do. Previously "odin4 -e"
+    // opened a session, erased nothing and reported success.
+    // --reboot and --redownload are jobs in their own right.
+    if (!haveFirmware && !redownload && !reboot) {
+        std::cerr << "odin4: nothing to do (see odin4 -h)" << std::endl;
+        return 1;
+    }
+
     // Auto-detect devices if none specified
     if (devicePaths.empty()) {
         auto devices = UsbDevice::listDevices();
@@ -244,9 +249,10 @@ int main(int argc, char** argv) {
     // Single device mode
     if (devicePaths.size() == 1) {
         Log::info("main", "Starting download on: " + devicePaths[0]);
-        
+
         DownloadEngine engine(devicePaths[0], &firmware);
-        
+        engine.setRebootAfterDownload(reboot);
+
         bool result;
         if (redownload) {
             result = engine.redownload();
@@ -263,13 +269,12 @@ int main(int argc, char** argv) {
     
     std::vector<std::thread> threads;
     std::atomic<int> successCount(0);
-    std::mutex mutex;
-    
+
     for (const auto& path : devicePaths) {
-        threads.emplace_back(downloadThread, path, firmware, redownload,
-                            std::ref(successCount), std::ref(mutex));
+        threads.emplace_back(downloadThread, path, firmware, redownload, reboot,
+                            std::ref(successCount));
     }
-    
+
     // Wait for all threads
     for (auto& t : threads) {
         if (t.joinable()) {

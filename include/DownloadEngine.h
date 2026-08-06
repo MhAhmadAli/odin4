@@ -32,20 +32,20 @@ enum class SessionSubCmd : int {
     FileTransferEnd = 4
 };
 
-// PIT sub-commands
+// PIT sub-commands (Heimdall: PitFilePacket::Request)
 enum class PITSubCmd : int {
-    Start = 0,
-    GetSize = 1,
-    GetData = 2,
-    End = 3
+    Flash = 0,        // Begin sending a PIT file to the device
+    Dump = 1,         // Ask the device for its PIT (responds with the size)
+    Part = 2,         // Request/announce a single transfer chunk
+    EndTransfer = 3   // Finish the PIT transfer
 };
 
-// File transfer sub-commands
+// File transfer sub-commands (Heimdall: FileTransferPacket::Request)
 enum class FileSubCmd : int {
-    Start = 0,
-    SetInfo = 1,
-    SendData = 2,
-    End = 3
+    Flash = 0,        // Begin flashing a file
+    Dump = 1,         // Read a file back from the device
+    Part = 2,         // Announce the byte count of the sequence that follows
+    End = 3           // Finish the sequence
 };
 
 // Connection sub-commands
@@ -71,11 +71,14 @@ public:
     
     DownloadEngine(const std::string& devicePath, FirmwareData* firmware);
     ~DownloadEngine();
-    
+
     // Non-copyable
     DownloadEngine(const DownloadEngine&) = delete;
     DownloadEngine& operator=(const DownloadEngine&) = delete;
-    
+
+    // Reboot the device into normal mode once the download finished (--reboot)
+    void setRebootAfterDownload(bool enable) { rebootAfterDownload_ = enable; }
+
     // Main operations
     bool download();              // Full download sequence
     bool redownload();            // Reboot to download mode
@@ -105,18 +108,21 @@ private:
     // Data transfer
     bool sendData(const char* data, int size);
     bool sendPitData(const char* data, int size);
-    
+
     // Response handling
-    bool deviceInfoAnalysis(char* data);
+    bool deviceInfoAnalysis(const char* data, size_t size);
     void writeProtectionFail(int code);
-    
+
     // Member variables
     std::unique_ptr<UsbDevice> device_;
     FirmwareData* firmware_;
     std::string devicePath_;
-    
+
+    // Size of a firmware data chunk. Negotiated with the device; it never
+    // applies to the fixed-size command packets built by request().
     int packetSize_;
     bool hasDeviceInfo_;
+    bool rebootAfterDownload_;
 };
 
 } // namespace Odin

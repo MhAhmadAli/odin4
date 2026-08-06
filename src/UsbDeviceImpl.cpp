@@ -7,6 +7,7 @@
 #include "Log.h"
 #include "OdinException.h"
 #include <cstring>
+#include <cstdint>
 #include <algorithm>
 
 namespace Odin {
@@ -35,7 +36,13 @@ std::vector<DeviceInfo> UsbDevice::listDevices() {
     
     libusb_device** deviceList = nullptr;
     ssize_t count = libusb_get_device_list(context, &deviceList);
-    
+
+    if (count < 0) {
+        Log::error("UsbDevice", "Failed to enumerate USB devices: " + std::to_string(count));
+        libusb_exit(context);
+        return devices;
+    }
+
     for (ssize_t i = 0; i < count; i++) {
         libusb_device_descriptor desc;
         if (libusb_get_device_descriptor(deviceList[i], &desc) != LIBUSB_SUCCESS) {
@@ -147,52 +154,54 @@ bool UsbDeviceImpl::initialize(const std::string& devicePath) {
     // Find the device
     libusb_device** deviceList = nullptr;
     ssize_t count = libusb_get_device_list(context_, &deviceList);
-    
+
+    if (count < 0) {
+        Log::error(TAG, "Failed to enumerate USB devices: " + std::to_string(count));
+        return false;
+    }
+
     for (ssize_t i = 0; i < count; i++) {
         uint8_t busNum = libusb_get_bus_number(deviceList[i]);
         uint8_t devAddr = libusb_get_device_address(deviceList[i]);
-        
-        std::string path = "/dev/bus/usb/" + 
-                           std::to_string(busNum) + "/" + 
+
+        std::string path = "/dev/bus/usb/" +
+                           std::to_string(busNum) + "/" +
                            std::to_string(devAddr);
-        
+
         if (path == devicePath) {
             device_ = deviceList[i];
             libusb_ref_device(device_);
             break;
         }
     }
-    
+
     libusb_free_device_list(deviceList, 1);
-    
+
+    // Deliberately no fallback here. The caller always passes a concrete path,
+    // so if that path is gone the right answer is to fail: silently picking
+    // whatever other Samsung device happens to be plugged in would flash the
+    // wrong phone, and in multi-device mode would point every thread at the
+    // same one.
     if (!device_) {
-        // If no path match, try to find any Samsung device in download mode
-        libusb_device** deviceList2 = nullptr;
-        count = libusb_get_device_list(context_, &deviceList2);
-        
-        for (ssize_t i = 0; i < count; i++) {
-            libusb_device_descriptor desc;
-            if (libusb_get_device_descriptor(deviceList2[i], &desc) != LIBUSB_SUCCESS) {
-                continue;
-            }
-            
-            if (desc.idVendor == SAMSUNG_VID &&
-                (desc.idProduct == SAMSUNG_PID_DOWNLOAD || 
-                 desc.idProduct == SAMSUNG_PID_DOWNLOAD2)) {
-                device_ = deviceList2[i];
-                libusb_ref_device(device_);
-                break;
-            }
-        }
-        
-        libusb_free_device_list(deviceList2, 1);
-    }
-    
-    if (!device_) {
-        Log::error(TAG, "Device not found");
+        Log::error(TAG, "Device not found: " + devicePath);
         return false;
     }
-    
+
+    // Confirm this really is a Samsung device in download mode before we start
+    // claiming interfaces on it.
+    libusb_device_descriptor probeDesc;
+    if (libusb_get_device_descriptor(device_, &probeDesc) != LIBUSB_SUCCESS) {
+        Log::error(TAG, "Failed to read device descriptor for " + devicePath);
+        return false;
+    }
+
+    if (probeDesc.idVendor != SAMSUNG_VID ||
+        (probeDesc.idProduct != SAMSUNG_PID_DOWNLOAD &&
+         probeDesc.idProduct != SAMSUNG_PID_DOWNLOAD2)) {
+        Log::error(TAG, devicePath + " is not a Samsung device in download mode");
+        return false;
+    }
+
     // Open device
     result = libusb_open(device_, &handle_);
     if (result != LIBUSB_SUCCESS) {
@@ -320,18 +329,30 @@ int UsbDeviceImpl::write(const char* data, size_t size, unsigned int timeout) {
         return -1;
     }
     
+    if (size > static_cast<size_t>(INT32_MAX)) {
+        Log::error(TAG, "Write size exceeds transfer limit");
+        return -1;
+    }
+
     int transferred = 0;
-    int result = libusb_bulk_transfer(handle_, outEndpoint_, 
+    int result = libusb_bulk_transfer(handle_, static_cast<unsigned char>(outEndpoint_),
                                        const_cast<unsigned char*>(
                                            reinterpret_cast<const unsigned char*>(data)),
-                                       static_cast<int>(size), 
+                                       static_cast<int>(size),
                                        &transferred, timeout);
-    
+
     if (result != LIBUSB_SUCCESS && result != LIBUSB_ERROR_TIMEOUT) {
         Log::error(TAG, "Write failed: " + std::to_string(result));
         return -1;
     }
-    
+
+    // A timeout is reported as a short write rather than an error so callers
+    // can see how far they got, but it should not pass unmentioned.
+    if (result == LIBUSB_ERROR_TIMEOUT) {
+        Log::error(TAG, "Write timed out after " + std::to_string(transferred) +
+                   "/" + std::to_string(size) + " bytes");
+    }
+
     return transferred;
 }
 
@@ -340,17 +361,22 @@ int UsbDeviceImpl::read(char* buffer, size_t size, unsigned int timeout, bool ex
         return -1;
     }
     
+    if (size > static_cast<size_t>(INT32_MAX)) {
+        Log::error(TAG, "Read size exceeds transfer limit");
+        return -1;
+    }
+
     int transferred = 0;
-    int result = libusb_bulk_transfer(handle_, inEndpoint_, 
+    int result = libusb_bulk_transfer(handle_, static_cast<unsigned char>(inEndpoint_),
                                        reinterpret_cast<unsigned char*>(buffer),
-                                       static_cast<int>(size), 
+                                       static_cast<int>(size),
                                        &transferred, timeout);
-    
+
     if (result != LIBUSB_SUCCESS && result != LIBUSB_ERROR_TIMEOUT) {
         Log::error(TAG, "Read failed: " + std::to_string(result));
         return -1;
     }
-    
+
     if (exactSize && transferred != static_cast<int>(size)) {
         Log::error(TAG, "Read size mismatch: expected " + std::to_string(size) + 
                    ", got " + std::to_string(transferred));
@@ -366,18 +392,29 @@ int UsbDeviceImpl::request(const char* data, size_t size) {
 
 int UsbDeviceImpl::claimInterface(unsigned int interfaceNum) {
     Log::info(TAG, "Claiming interface " + std::to_string(interfaceNum));
-    
-    int result = libusb_claim_interface(handle_, interfaceNum);
-    
+
+    int result = libusb_claim_interface(handle_, static_cast<int>(interfaceNum));
+
 #ifdef __linux__
     if (result != LIBUSB_SUCCESS) {
-        Log::info(TAG, "Detaching kernel driver...");
-        detachedDriver_ = true;
-        libusb_detach_kernel_driver(handle_, interfaceNum);
-        result = libusb_claim_interface(handle_, interfaceNum);
+        // Only record a detach that actually happened, otherwise
+        // releaseInterface() re-attaches a driver we never took away.
+        if (libusb_kernel_driver_active(handle_, static_cast<int>(interfaceNum)) == 1) {
+            Log::info(TAG, "Detaching kernel driver...");
+            int detachResult = libusb_detach_kernel_driver(handle_,
+                                                           static_cast<int>(interfaceNum));
+            if (detachResult == LIBUSB_SUCCESS) {
+                detachedDriver_ = true;
+            } else {
+                Log::error(TAG, "Failed to detach kernel driver: " +
+                           std::to_string(detachResult));
+            }
+        }
+
+        result = libusb_claim_interface(handle_, static_cast<int>(interfaceNum));
     }
 #endif
-    
+
     if (result != LIBUSB_SUCCESS) {
         Log::error(TAG, "Failed to claim interface: " + std::to_string(result));
         return result;
@@ -403,40 +440,17 @@ int UsbDeviceImpl::releaseInterface() {
     Log::info(TAG, "Releasing interface");
     
     int result = libusb_release_interface(handle_, interfaceIndex_);
-    
+
 #ifdef __linux__
     if (detachedDriver_) {
         Log::info(TAG, "Re-attaching kernel driver...");
         libusb_attach_kernel_driver(handle_, interfaceIndex_);
+        detachedDriver_ = false;
     }
 #endif
-    
+
     interfaceClaimed_ = false;
     return result;
-}
-
-uint8_t* UsbDeviceImpl::getNextDescriptor(uint8_t* start, uint8_t* end,
-                                           uint8_t descriptorType, 
-                                           uint8_t descriptorSubtype,
-                                           void** context) {
-    // Basic descriptor iteration
-    uint8_t* ptr = start;
-    while (ptr < end) {
-        if (ptr[0] == 0) {
-            break;
-        }
-        
-        if (ptr[1] == descriptorType) {
-            if (descriptorSubtype == 0 || ptr[2] == descriptorSubtype) {
-                *context = ptr;
-                return ptr + ptr[0];
-            }
-        }
-        
-        ptr += ptr[0];
-    }
-    
-    return nullptr;
 }
 
 } // namespace Odin

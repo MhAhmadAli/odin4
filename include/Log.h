@@ -42,7 +42,12 @@ private:
     static bool mMultiDeviceMode;
     static bool mInteractiveMode;
     static Callback mCallback;
-    static std::string mDevicePrefix;
+
+    // Per-thread: in multi-device mode every download runs on its own thread
+    // and sets its own prefix. A single shared string meant whichever thread
+    // started last relabelled every other thread's output.
+    static thread_local std::string mDevicePrefix;
+
     static std::mutex mMutex;
 };
 

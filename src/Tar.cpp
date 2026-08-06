@@ -7,6 +7,7 @@
 #include "Log.h"
 #include <cstring>
 #include <cstdio>
+#include <cstdint>
 
 namespace Odin {
 
@@ -59,11 +60,28 @@ bool Tar::open() {
     
     isOpen_ = true;
     entries_.clear();
-    
+
+    // Work out how big the archive is so entry sizes taken from headers can be
+    // sanity checked against it.
+    if (fseek(file_, 0, SEEK_END) != 0) {
+        Log::error(TAG, "Failed to seek: " + path_);
+        close();
+        return false;
+    }
+
+    long archiveSizeSigned = ftell(file_);
+    if (archiveSizeSigned < 0) {
+        Log::error(TAG, "Failed to determine size of: " + path_);
+        close();
+        return false;
+    }
+    size_t archiveSize = static_cast<size_t>(archiveSizeSigned);
+    rewind(file_);
+
     // Parse TAR entries
     TarHeader header;
     size_t currentOffset = 0;
-    
+
     while (fread(&header, sizeof(header), 1, file_) == 1) {
         // Check for end of archive (two zero blocks)
         bool isEmpty = true;
@@ -86,20 +104,29 @@ bool Tar::open() {
         
         // Record the data offset (after this header)
         entry.offset = currentOffset + sizeof(TarHeader);
-        
+
+        // A header claiming more data than the file holds is corrupt; stop
+        // rather than handing a bogus size on to the allocator.
+        if (entry.size > archiveSize - entry.offset) {
+            Log::error(TAG, "Entry " + entry.name + " extends past the end of the archive");
+            break;
+        }
+
         // Add to entries list
         if (entry.isFile && entry.size > 0) {
             entries_.push_back(entry);
         }
-        
+
         // Skip to next header (align to 512 bytes)
         size_t dataBlocks = (entry.size + 511) / 512;
         size_t skipBytes = dataBlocks * 512;
-        
-        fseek(file_, static_cast<long>(skipBytes), SEEK_CUR);
+
+        if (fseek(file_, static_cast<long>(skipBytes), SEEK_CUR) != 0) {
+            break;
+        }
         currentOffset += sizeof(TarHeader) + skipBytes;
     }
-    
+
     Log::info(TAG, "Parsed " + std::to_string(entries_.size()) + " entries");
     return true;
 }
@@ -163,13 +190,27 @@ bool Tar::parseHeader(const char* data, TarEntry& entry) {
 
 size_t Tar::octalToDecimal(const char* str, size_t len) {
     size_t result = 0;
-    
-    for (size_t i = 0; i < len && str[i] != '\0' && str[i] != ' '; i++) {
-        if (str[i] >= '0' && str[i] <= '7') {
-            result = (result << 3) + (str[i] - '0');
-        }
+    size_t i = 0;
+
+    // Some writers right-align these fields and pad on the left with spaces.
+    // Stopping at the first space meant those headers all decoded as zero.
+    while (i < len && (str[i] == ' ' || str[i] == '\t')) {
+        i++;
     }
-    
+
+    for (; i < len && str[i] != '\0' && str[i] != ' '; i++) {
+        if (str[i] < '0' || str[i] > '7') {
+            break;
+        }
+
+        // Refuse to wrap around on a corrupt field
+        if (result > (SIZE_MAX >> 3)) {
+            return 0;
+        }
+
+        result = (result << 3) + static_cast<size_t>(str[i] - '0');
+    }
+
     return result;
 }
 

@@ -92,10 +92,7 @@ public:
 private:
     bool initialize(const std::string& devicePath);
     void checkProductName(uint8_t productIndex);
-    uint8_t* getNextDescriptor(uint8_t* start, uint8_t* end, 
-                                uint8_t descriptorType, uint8_t descriptorSubtype,
-                                void** context);
-    
+
     libusb_context* context_;
     libusb_device_handle* handle_;
     libusb_device* device_;

@@ -13,7 +13,7 @@ namespace Odin {
 bool Log::mMultiDeviceMode = false;
 bool Log::mInteractiveMode = false;
 Log::Callback Log::mCallback = nullptr;
-std::string Log::mDevicePrefix;
+thread_local std::string Log::mDevicePrefix;
 std::mutex Log::mMutex;
 
 void Log::print(const std::string& tag, const std::string& message) {
@@ -72,12 +72,12 @@ Log::Callback Log::getCallback() {
 }
 
 void Log::setDevicePrefix(const std::string& prefix) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    // Thread-local, so no lock is needed (and taking mMutex here would
+    // deadlock if it were ever called from inside output()).
     mDevicePrefix = prefix;
 }
 
 std::string Log::getDevicePrefix() {
-    std::lock_guard<std::mutex> lock(mMutex);
     return mDevicePrefix;
 }
 

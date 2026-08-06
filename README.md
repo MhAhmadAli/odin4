@@ -27,6 +27,9 @@ A reconstructed version of Samsung's Odin4 firmware flashing tool, based on:
 - PIT (Partition Information Table) handling
 - MD5/SHA256 verification
 
+For `.tar.md5` files the checksum appended by Samsung is checked against the
+archive contents, and a mismatch aborts the flash.
+
 ## Requirements
 
 ### macOS
@@ -61,6 +64,10 @@ Ensure you have the required dependencies installed (see Requirements above).
 make
 ```
 
+Object files land in `build/`. `liblz4` and `crypto++` are optional: the build
+detects them with `pkg-config` and falls back to OpenSSL for hashing when
+crypto++ is absent.
+
 ### Clean
 
 ```bash
@@ -71,6 +78,12 @@ make clean
 
 ```bash
 sudo make install
+```
+
+`PREFIX` (default `/usr/local`) and `DESTDIR` are both honoured:
+
+```bash
+make install PREFIX=/usr DESTDIR=/tmp/staging
 ```
 
 Or manually copy the `odin4` binary to your PATH.
@@ -113,11 +126,19 @@ odin4 -V partition.pit -b BL.tar.md5 -a AP.tar.md5
 | `-c FILE` | Add CP (Modem) image file |
 | `-s FILE` | Add CSC file |
 | `-u FILE` | Add UMS file |
-| `-V FILE` | Validate with PIT file |
+| `-V FILE` | Write the given PIT (partition table) to the device |
 | `-e` | Enable NAND erase |
-| `-d PATH` | Specify device path |
+| `-d PATH` | Specify device path (repeat for multi-device flashing) |
 | `--reboot` | Reboot to normal mode after flash |
 | `--redownload` | Reboot to download mode |
+
+> [!CAUTION]
+> `-V` repartitions the device. Only pass a PIT that matches the exact model
+> you are flashing.
+
+At least one of `-b`, `-a`, `-c`, `-s`, `-u`, `-V`, `--reboot` or
+`--redownload` must be given; the tool will not open a session with nothing
+to do.
 
 ## udev Rules (Linux)
 

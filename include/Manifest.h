@@ -25,14 +25,15 @@ public:
     // Get expected hash for a file
     std::string getHash(const std::string& filename) const;
     
-    // Calculate SHA256 of a file
-    static std::string calculateSHA256(const std::string& path);
+    // Calculate SHA256 of a file. maxBytes limits how much of the file is
+    // hashed; 0 means the whole file.
+    static std::string calculateSHA256(const std::string& path, size_t maxBytes = 0);
     static std::string calculateSHA256(const char* data, size_t size);
-    
-    // Calculate MD5 of a file
-    static std::string calculateMD5(const std::string& path);
+
+    // Calculate MD5 of a file (see calculateSHA256 for maxBytes)
+    static std::string calculateMD5(const std::string& path, size_t maxBytes = 0);
     static std::string calculateMD5(const char* data, size_t size);
-    
+
 private:
     std::string path_;
     std::map<std::string, std::string> hashes_;  // filename -> hash
